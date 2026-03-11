@@ -1,0 +1,102 @@
+{
+  "session_start": "20260311_003559",
+  "saved_at": "2026-03-11 00:37:00",
+  "students": {
+    "0": {
+      "avg_score": 0.789,
+      "total_frames": 1,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "1": {
+      "avg_score": 0.813,
+      "total_frames": 14,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "2": {
+      "avg_score": 0.797,
+      "total_frames": 2,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "3": {
+      "avg_score": 0.813,
+      "total_frames": 9,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "4": {
+      "avg_score": 0.651,
+      "total_frames": 69,
+      "attentive_pct": 65.2,
+      "distracted_pct": 34.8,
+      "phone_frames": 14,
+      "reading_frames": 0
+    },
+    "5": {
+      "avg_score": 0.84,
+      "total_frames": 1,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "6": {
+      "avg_score": 0.3,
+      "total_frames": 1,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 1,
+      "reading_frames": 0
+    },
+    "7": {
+      "avg_score": 0.828,
+      "total_frames": 1,
+      "attentive_pct": 100.0,
+      "distracted_pct": 0.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "8": {
+      "avg_score": 0.3,
+      "total_frames": 1,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 1,
+      "reading_frames": 0
+    },
+    "9": {
+      "avg_score": 0.423,
+      "total_frames": 1,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "10": {
+      "avg_score": 0.416,
+      "total_frames": 1,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "11": {
+      "avg_score": 0.394,
+      "total_frames": 2,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    }
+  }
+}

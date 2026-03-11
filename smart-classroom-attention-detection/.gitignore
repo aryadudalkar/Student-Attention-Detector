@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+venv/
+env/
+.env
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+.pytest_cache/
+
+# Model weights (use Git LFS if you want to track large files)
+model/*.pt
+model/*.pth
+
+# Misc
+*.bak
+*.swp
