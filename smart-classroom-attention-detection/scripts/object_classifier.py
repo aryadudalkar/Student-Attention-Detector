@@ -10,6 +10,8 @@ COCO class IDs used:
     63 - laptop
 """
 
+import os
+
 from ultralytics import YOLO
 
 # COCO class IDs
@@ -23,11 +25,14 @@ _yolo_model = None
 def _get_model():
     global _yolo_model
     if _yolo_model is None:
-        # Uses yolov8n.pt from the parent directory; YOLO will auto-download
-        # from Ultralytics if not found locally.
-        import os
-        local_path = os.path.join(os.path.dirname(__file__), "..", "yolov8n.pt")
-        _yolo_model = YOLO(local_path if os.path.exists(local_path) else "yolov8n.pt")
+        base = os.path.dirname(__file__)
+        custom_model = os.path.join(base, "..", "model", "phone_book_best.pt")
+        fallback_model = os.path.join(base, "..", "yolov8n.pt")
+        if os.path.exists(custom_model):
+            _yolo_model = YOLO(custom_model)
+        else:
+            # Fallback to COCO model until classroom-specific model is trained.
+            _yolo_model = YOLO(fallback_model if os.path.exists(fallback_model) else "yolov8n.pt")
     return _yolo_model
 
 

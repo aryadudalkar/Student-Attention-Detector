@@ -3,3 +3,6 @@ opencv-python
 torch
 torchvision
 numpy
+mediapipe
+deep-sort-realtime
+insightface

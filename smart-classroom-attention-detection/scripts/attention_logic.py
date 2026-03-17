@@ -17,7 +17,16 @@ def calculate_attention(yolo_score, head_score, gaze_score, pose_data,
     """
     score = 0.0
     score += yolo_score * 0.20
-    score += head_score * 0.30
+    if isinstance(head_score, dict):
+        head_value = float(head_score.get("score", 0.3))
+        pitch = float(head_score.get("pitch", 0.0))
+        yaw = float(head_score.get("yaw", 0.0))
+    else:
+        head_value = float(head_score)
+        pitch = 0.0
+        yaw = 0.0
+
+    score += head_value * 0.30
     score += gaze_score * 0.30
 
     head_down = False
@@ -35,6 +44,10 @@ def calculate_attention(yolo_score, head_score, gaze_score, pose_data,
         score = max(score, 0.72)          # looking down at a book → attentive
     elif object_detected == "laptop":
         score = max(0.0, score - 0.05)    # laptop: slight uncertainty
+
+    # Hard pose rule requested for strong distraction cues.
+    if abs(yaw) > 30.0 or pitch < -20.0:
+        score = min(score, 0.35)
 
     return round(max(0.0, min(1.0, score)), 3)
 
