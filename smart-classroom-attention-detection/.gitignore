@@ -20,9 +20,9 @@ Thumbs.db
 *.log
 .pytest_cache/
 
-# Model weights (use Git LFS if you want to track large files)
-model/*.pt
-model/*.pth
+# Model weights - tracked with Git LFS for large files
+# model/*.pt
+# model/*.pth
 
 # Misc
 *.bak
