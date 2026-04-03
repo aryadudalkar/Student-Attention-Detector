@@ -107,6 +107,7 @@ class SimpleTracker:
         for trk in tracks:
             if not trk.is_confirmed():
                 continue
+            l, t, r, b = trk.to_ltrb()
             bbox = (int(l), int(t), int(r), int(b))
 
             # Try ArcFace recognition if registry is available
