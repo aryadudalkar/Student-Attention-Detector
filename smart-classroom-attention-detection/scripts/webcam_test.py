@@ -25,6 +25,7 @@ from score_tracker import ScoreTracker
 from tracker import SimpleTracker
 from face_detector import FaceDetector
 from seat_manager import build_seat_rois, in_any_seat
+from api_client import start_session, end_session, log_attention_batch, get_or_create_student
 
 # ------------------------------------------------------------------
 # Load models
@@ -85,6 +86,11 @@ def run(camera_index: int = 0):
     tracker       = SimpleTracker()
     score_tracker = ScoreTracker()
     seat_rois_px  = None
+
+    # API session setup
+    session_id = start_session(label="Webcam Session")
+    batch_logs = []
+    batch_counter = 0
 
     print(f"[INFO] Webcam started (camera {camera_index})")
     print("[INFO] Press ESC to quit.\n")
@@ -157,6 +163,31 @@ def run(camera_index: int = 0):
             label, color = get_attention_label(final_score, object_detected)
 
             score_tracker.update(student_id, final_score, label)
+
+            # Send to API
+            db_student_id = get_or_create_student(student_id, name=student_name, usn=student_usn)
+            if db_student_id and session_id:
+                batch_logs.append({
+                    "session": session_id,
+                    "student": db_student_id,
+                    "attention_score": final_score,
+                    "label": label,
+                    "object_detected": object_detected,
+                    "yolo_score": yolo_score,
+                    "gaze_score": gaze_score,
+                    "head_score": head_score_val,
+                    "pitch": head_details.get("pitch"),
+                    "yaw": head_details.get("yaw"),
+                    "roll": head_details.get("roll"),
+                })
+
+            # Send batch every 30 frames
+            batch_counter += 1
+            if batch_counter >= 30:
+                log_attention_batch(batch_logs)
+                batch_logs = []
+                batch_counter = 0
+
             _draw_hud(
                 frame,
                 student_id,
@@ -176,6 +207,11 @@ def run(camera_index: int = 0):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
+    # Flush remaining logs and end session
+    log_attention_batch(batch_logs)
+    if session_id:
+        end_session(session_id)
+
     cap.release()
     cv2.destroyAllWindows()
 
@@ -193,8 +229,3 @@ def run(camera_index: int = 0):
         )
 
     score_tracker.print_weekly_report()
-
-
-if __name__ == "__main__":
-    cam = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    run(cam)
