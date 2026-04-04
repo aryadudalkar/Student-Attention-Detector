@@ -1,19 +1,12 @@
 """
 Smart Classroom — Live Webcam Pipeline
 ========================================
-Runs real-time attention detection on a webcam feed.
-
-Usage:
-    python webcam_test.py           # default camera (index 0)
-    python webcam_test.py 1         # camera index 1
-
-Press ESC to quit.  A JSON session report is saved to ../attention_logs/.
+HYBRID OPTIMIZED VERSION with API integration
 """
 
 import cv2
 import os
 import sys
-
 from ultralytics import YOLO
 
 from head_pose import get_head_score
@@ -25,14 +18,15 @@ from score_tracker import ScoreTracker
 from tracker import SimpleTracker
 from face_detector import FaceDetector
 from seat_manager import build_seat_rois, in_any_seat
+from api_client import start_session, end_session, log_attention_batch, get_or_create_student
 
 # ------------------------------------------------------------------
 # Load models
 # ------------------------------------------------------------------
 _BASE = os.path.dirname(__file__)
 
-_person_model_path = os.path.join(_BASE, "..", "yolov8m.pt")
-person_model = YOLO(_person_model_path if os.path.exists(_person_model_path) else "yolov8m.pt")
+_person_model_path = os.path.join(_BASE, "..", "yolov8n.pt")
+person_model = YOLO(_person_model_path if os.path.exists(_person_model_path) else "yolov8n.pt")
 
 _attention_model_path = os.path.join(_BASE, "..", "model", "best.pt")
 attention_model = YOLO(_attention_model_path) if os.path.exists(_attention_model_path) else None
@@ -49,21 +43,16 @@ def _yolo_confidence(model, crop) -> float:
 
 
 def _draw_hud(frame, student_id, student_name, label, score, x1, y1, x2, y2, color, usn=None, face_bbox=None):
-    """Draw bounding box + label overlay for one student."""
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
     if face_bbox is not None:
         fx1, fy1, fx2, fy2 = face_bbox
         cv2.rectangle(frame, (fx1, fy1), (fx2, fy2), (255, 220, 0), 2)
-
-    # Display USN last 3 digits if available, else student name, else numeric ID
     if usn:
         name_str = f"#{usn[-3:]}"
     elif student_name:
         name_str = f"{student_name}"
     else:
         name_str = f"ID:{student_id}"
-    
     tag = f"{name_str}  {label}  ({score:.2f})"
     (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
     bg_y1 = max(0, y1 - th - 8)
@@ -82,37 +71,71 @@ def run(camera_index: int = 0):
         print(f"[ERROR] Cannot open camera index {camera_index}")
         sys.exit(1)
 
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
     tracker       = SimpleTracker()
     score_tracker = ScoreTracker()
     seat_rois_px  = None
 
-    print(f"[INFO] Webcam started (camera {camera_index})")
+    # API session setup
+    session_id = start_session(label="Webcam Session")
+    batch_logs = []
+    batch_counter = 0
+
+    print(f"[INFO] Webcam started (camera {camera_index}) - HYBRID MODE")
     print("[INFO] Press ESC to quit.\n")
+
+    # Smart frame skipping
+    frame_count = 0
+    process_detection_every = 3
+    process_attention_every = 2
+    process_heavy_every = 4
+
+    last_boxes_list = []
+    last_scores = {}
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
+        frame_count += 1
+
         if seat_rois_px is None:
             seat_rois_px = build_seat_rois(frame.shape)
 
-        person_results = person_model(frame, verbose=False, conf=0.50)
-        boxes_list = []
-        for result in person_results:
-            for box in result.boxes:
-                if int(box.cls[0]) != 0:
-                    continue
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = float(box.conf[0])
-                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                if not in_any_seat((cx, cy), seat_rois_px):
-                    continue
-                boxes_list.append((x1, y1, x2, y2, conf))
+        # STAGE 1: Person detection (every 3 frames)
+        if frame_count % process_detection_every == 0:
+            person_results = person_model(frame, verbose=False, conf=0.65)
+            boxes_list = []
+            for result in person_results:
+                for box in result.boxes:
+                    if int(box.cls[0]) != 0:
+                        continue
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = float(box.conf[0])
+                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                    if not in_any_seat((cx, cy), seat_rois_px):
+                        continue
+                    boxes_list.append((x1, y1, x2, y2, conf))
+            last_boxes_list = boxes_list
+        else:
+            boxes_list = last_boxes_list
+
+        if not boxes_list:
+            cv2.imshow("Smart Classroom — Webcam", frame)
+            if cv2.waitKey(1) & 0xFF == 27:
+                break
+            continue
 
         tracked = tracker.update(boxes_list, frame=frame)
 
-        for trk in tracked:
+        # STAGE 2: Per-student analysis (max 3 students)
+        max_students = 3
+        for trk in tracked[:max_students]:
             student_id = trk["student_id"]
             student_name = trk.get("name")
             student_usn = trk.get("usn")
@@ -136,11 +159,24 @@ def run(camera_index: int = 0):
                 face_crop = person_crop
                 face_box_global = None
 
+            # STAGE 3: Tiered model processing
             yolo_score = _yolo_confidence(attention_model, person_crop)
             head_score_val, head_details = get_head_score(face_crop, return_details=True)
-            gaze_score = get_gaze_score(face_crop)
-            pose_data = get_pose_features(frame, (x1, y1, x2, y2))
-            object_detected = classify_hand_object(frame, (x1, y1, x2, y2))
+
+            if frame_count % process_attention_every == 0:
+                gaze_score = get_gaze_score(face_crop)
+                last_scores[f"{student_id}_gaze"] = gaze_score
+            else:
+                gaze_score = last_scores.get(f"{student_id}_gaze", 0.5)
+
+            if frame_count % process_heavy_every == 0:
+                pose_data = get_pose_features(frame, (x1, y1, x2, y2))
+                object_detected = classify_hand_object(frame, (x1, y1, x2, y2))
+                last_scores[f"{student_id}_pose"] = pose_data
+                last_scores[f"{student_id}_object"] = object_detected
+            else:
+                pose_data = last_scores.get(f"{student_id}_pose", {})
+                object_detected = last_scores.get(f"{student_id}_object", "none")
 
             final_score = calculate_attention(
                 yolo_score,
@@ -157,24 +193,44 @@ def run(camera_index: int = 0):
             label, color = get_attention_label(final_score, object_detected)
 
             score_tracker.update(student_id, final_score, label)
+
+            # Send to API
+            db_student_id = get_or_create_student(student_id, name=student_name, usn=student_usn)
+            if db_student_id and session_id:
+                batch_logs.append({
+                    "session": session_id,
+                    "student": db_student_id,
+                    "attention_score": final_score,
+                    "label": label,
+                    "object_detected": object_detected,
+                    "yolo_score": yolo_score,
+                    "gaze_score": gaze_score,
+                    "head_score": head_score_val,
+                    "pitch": head_details.get("pitch"),
+                    "yaw": head_details.get("yaw"),
+                    "roll": head_details.get("roll"),
+                })
+
+            # Send batch every 30 frames
+            batch_counter += 1
+            if batch_counter >= 30:
+                log_attention_batch(batch_logs)
+                batch_logs = []
+                batch_counter = 0
+
             _draw_hud(
-                frame,
-                student_id,
-                student_name,
-                label,
-                final_score,
-                x1,
-                y1,
-                x2,
-                y2,
-                color,
-                usn=student_usn,
-                face_bbox=face_box_global,
+                frame, student_id, student_name, label, final_score,
+                x1, y1, x2, y2, color, usn=student_usn, face_bbox=face_box_global,
             )
 
         cv2.imshow("Smart Classroom — Webcam", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
+
+    # Flush remaining logs and end session
+    log_attention_batch(batch_logs)
+    if session_id:
+        end_session(session_id)
 
     cap.release()
     cv2.destroyAllWindows()
@@ -191,7 +247,6 @@ def run(camera_index: int = 0):
             f"phone_frames={data['phone_frames']}  "
             f"reading_frames={data['reading_frames']}"
         )
-
     score_tracker.print_weekly_report()
 
 

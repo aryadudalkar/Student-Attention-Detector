@@ -27,3 +27,6 @@ model/*.pth
 # Misc
 *.bak
 *.swp
+
+.venv/
+db.sqlite3
