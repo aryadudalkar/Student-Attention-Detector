@@ -130,6 +130,15 @@ def session_summary(request, session_id):
     summaries = SessionSummary.objects.filter(
         session_id=session_id
     ).select_related('student').order_by('-avg_score')
+
+    if not summaries.exists():
+        session = Session.objects.filter(id=session_id).first()
+        if session and session.is_active:
+            _auto_generate_summary(session)
+            summaries = SessionSummary.objects.filter(
+                session_id=session_id
+            ).select_related('student').order_by('-avg_score')
+
     return Response(SessionSummarySerializer(summaries, many=True).data)
 
 
@@ -238,6 +247,14 @@ def class_overview(request, session_id):
     summaries = SessionSummary.objects.filter(
         session_id=session_id
     ).select_related('student')
+
+    if not summaries.exists():
+        # Maybe it's a live session? Try generating live summaries.
+        session = Session.objects.filter(id=session_id).first()
+        if session and session.is_active:
+            _auto_generate_summary(session)
+            # Re-fetch after generating
+            summaries = SessionSummary.objects.filter(session_id=session_id).select_related('student')
 
     if not summaries.exists():
         return Response({'error': 'No data for this session'}, status=404)
