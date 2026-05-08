@@ -240,28 +240,64 @@ def student_weekly_report(request, student_id):
 
 @api_view(['GET'])
 def class_overview(request, session_id):
-    """
-    Get a class-wide overview for a session.
-    Great for the teacher dashboard.
-    """
-    summaries = SessionSummary.objects.filter(
-        session_id=session_id
-    ).select_related('student')
+    try:
+        session = Session.objects.get(id=session_id)
+    except Session.DoesNotExist:
+        return Response({'error': 'Session not found'}, status=404)
 
-    if not summaries.exists():
-        # Maybe it's a live session? Try generating live summaries.
-        session = Session.objects.filter(id=session_id).first()
-        if session and session.is_active:
-            _auto_generate_summary(session)
-            # Re-fetch after generating
-            summaries = SessionSummary.objects.filter(session_id=session_id).select_related('student')
+    # If session is active, read from live AttentionLog records
+    if session.is_active:
+        logs = AttentionLog.objects.filter(session_id=session_id)
+        if not logs.exists():
+            return Response({'error': 'No data yet'}, status=404)
 
+        student_ids = logs.values_list('student', flat=True).distinct()
+        total = student_ids.count()
+
+        # Get latest label per student
+        from django.db.models import Max
+        attentive = 0
+        partial = 0
+        distracted = 0
+        phone = 0
+        scores = []
+
+        for sid in student_ids:
+            student_logs = logs.filter(student_id=sid)
+            latest = student_logs.order_by('-timestamp').first()
+            avg = sum(student_logs.values_list('attention_score', flat=True)) / student_logs.count()
+            scores.append(avg)
+            if avg >= 0.70:
+                attentive += 1
+            elif avg >= 0.50:
+                partial += 1
+            else:
+                distracted += 1
+            if student_logs.filter(object_detected='phone').exists():
+                phone += 1
+
+        avg_score = sum(scores) / len(scores) if scores else 0
+
+        return Response({
+            'session_id': session_id,
+            'total_students': total,
+            'class_avg_score': round(avg_score, 3),
+            'class_grade': _score_to_grade(avg_score),
+            'attentive_count': attentive,
+            'partially_attentive_count': partial,
+            'distracted_count': distracted,
+            'phone_detected_count': phone,
+            'attentive_pct': round(attentive / total * 100, 1) if total else 0,
+            'distracted_pct': round(distracted / total * 100, 1) if total else 0,
+        })
+
+    # If session is ended, read from SessionSummary
+    summaries = SessionSummary.objects.filter(session_id=session_id).select_related('student')
     if not summaries.exists():
         return Response({'error': 'No data for this session'}, status=404)
 
     total = summaries.count()
     avg_score = sum(s.avg_score for s in summaries) / total
-
     attentive = summaries.filter(avg_score__gte=0.70).count()
     partial = summaries.filter(avg_score__gte=0.50, avg_score__lt=0.70).count()
     distracted = summaries.filter(avg_score__lt=0.50).count()
@@ -279,8 +315,6 @@ def class_overview(request, session_id):
         'attentive_pct': round(attentive / total * 100, 1),
         'distracted_pct': round(distracted / total * 100, 1),
     })
-
-
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
