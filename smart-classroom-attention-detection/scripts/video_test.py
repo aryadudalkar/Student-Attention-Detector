@@ -237,3 +237,7 @@ def run(video_path: str):
         )
 
     score_tracker.print_weekly_report()
+
+if __name__ == "__main__":
+    video = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_BASE, "..", "sample.mp4")
+    run(video)

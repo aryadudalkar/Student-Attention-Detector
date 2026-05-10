@@ -19,6 +19,20 @@ pip install -r requirements.txt
 
 ## Run
 
+Backend (FastAPI):
+
+```bash
+python -m uvicorn backend_fastapi.main:app --reload --port 8000
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 Webcam:
 
 ```bash
