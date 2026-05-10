@@ -100,14 +100,6 @@ def run(camera_index: int = 0):
 
     # SMART FRAME SKIPPING: Process detection at different rates
     frame_count = 0
-    
-    # Different processing rates for different modules
-    process_detection_every = 6      # Run YOLO person detection every 6 frames (was 3)
-    process_attention_every = 3      # Run attention models every 3 frames (was 2)
-    process_heavy_every = 10         # Run heavy modules (gaze, pose) every 10 frames (was 4)
-    
-    last_boxes_list = []
-    last_scores = {}  # Cache scores between frames
 
     while True:
         ret, frame = cap.read()
@@ -116,26 +108,22 @@ def run(camera_index: int = 0):
         
         frame_count += 1
         
+        # --- Detect persons ---
         if seat_rois_px is None:
             seat_rois_px = build_seat_rois(frame.shape)
 
-        # STAGE 1: Person detection (runs less frequently)
-        if frame_count % process_detection_every == 0:
-            person_results = person_model(frame, verbose=False, conf=0.65)
-            boxes_list = []
-            for result in person_results:
-                for box in result.boxes:
-                    if int(box.cls[0]) != 0:
-                        continue
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = float(box.conf[0])
-                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                    if not in_any_seat((cx, cy), seat_rois_px):
-                        continue
-                    boxes_list.append((x1, y1, x2, y2, conf))
-            last_boxes_list = boxes_list
-        else:
-            boxes_list = last_boxes_list
+        person_results = person_model(frame, verbose=False, conf=0.50)
+        boxes_list = []
+        for result in person_results:
+            for box in result.boxes:
+                if int(box.cls[0]) != 0:   # class 0 = person (COCO)
+                    continue
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = float(box.conf[0])
+                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                if not in_any_seat((cx, cy), seat_rois_px):
+                    continue
+                boxes_list.append((x1, y1, x2, y2, conf))
 
         # Early skip if no detections
         if not boxes_list:
@@ -170,34 +158,23 @@ def run(camera_index: int = 0):
                 fx1, fy1, fx2, fy2, _ = face_box_local
                 face_crop = person_crop[fy1:fy2, fx1:fx2]
                 face_box_global = (x1 + fx1, y1 + fy1, x1 + fx2, y1 + fy2)
+                has_face = True
             else:
-                face_crop = person_crop
+                face_crop = None
                 face_box_global = None
+                has_face = False
 
-            # STAGE 3: Run different models based on frame count
-            # Always run faster models
             yolo_score = _yolo_confidence(attention_model, person_crop)
             
-            # Head pose - moderate speed, run every frame
-            head_score_val, head_details = get_head_score(face_crop, return_details=True)
-            
-            # Heavier modules - run less frequently
-            if frame_count % process_attention_every == 0:
+            if has_face and face_crop is not None and face_crop.size > 0:
+                head_score_val, head_details = get_head_score(face_crop, return_details=True)
                 gaze_score = get_gaze_score(face_crop)
-                # Cache the result
-                last_scores[f"{student_id}_gaze"] = gaze_score
             else:
-                # Use cached value
-                gaze_score = last_scores.get(f"{student_id}_gaze", 0.5)
+                head_score_val, head_details = 0.3, {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}
+                gaze_score = 0.5
             
-            if frame_count % process_heavy_every == 0:
-                pose_data = get_pose_features(frame, (x1, y1, x2, y2))
-                object_detected = classify_hand_object(frame, (x1, y1, x2, y2))
-                last_scores[f"{student_id}_pose"] = pose_data
-                last_scores[f"{student_id}_object"] = object_detected
-            else:
-                pose_data = last_scores.get(f"{student_id}_pose", {})
-                object_detected = last_scores.get(f"{student_id}_object", None)
+            pose_data = get_pose_features(frame, (x1, y1, x2, y2))
+            object_detected = classify_hand_object(frame, (x1, y1, x2, y2))
 
             final_score = calculate_attention(
                 yolo_score,

@@ -21,6 +21,7 @@ except ImportError:
 
 _REGISTRY_DB = None
 _FACE_MODEL = None
+_INSIGHTFACE_WARNED = False
 
 
 def _get_db_path():
@@ -55,10 +56,12 @@ def _init_db():
 
 def _get_face_model():
     """Load ArcFace model for face embeddings."""
-    global _FACE_MODEL
+    global _FACE_MODEL, _INSIGHTFACE_WARNED
     if _FACE_MODEL is None:
         if not _INSIGHTFACE_AVAILABLE:
-            print("[WARNING] insightface not available. Using MediaPipe fallback.")
+            if not _INSIGHTFACE_WARNED:
+                print("[WARNING] insightface not available. Using MediaPipe fallback.")
+                _INSIGHTFACE_WARNED = True
             return None
         try:
             _FACE_MODEL = insightface.app.FaceAnalysis(
@@ -67,7 +70,9 @@ def _get_face_model():
             )
             _FACE_MODEL.prepare(ctx_id=-1, det_size=(640, 480))
         except Exception as e:
-            print(f"[WARNING] Failed to load ArcFace: {e}. Using fallback.")
+            if not _INSIGHTFACE_WARNED:
+                print(f"[WARNING] Failed to load ArcFace: {e}. Using fallback.")
+                _INSIGHTFACE_WARNED = True
             _FACE_MODEL = None
     return _FACE_MODEL
 

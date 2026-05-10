@@ -2,7 +2,11 @@ ultralytics
 opencv-python
 torch
 torchvision
-numpy
+numpy<2.0.0
 mediapipe
 deep-sort-realtime
 insightface
+fastapi
+uvicorn
+sqlalchemy
+pydantic

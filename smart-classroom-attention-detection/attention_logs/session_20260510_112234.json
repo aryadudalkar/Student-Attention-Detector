@@ -1,0 +1,30 @@
+{
+  "session_start": "20260510_112234",
+  "saved_at": "2026-05-10 11:26:38",
+  "students": {
+    "1": {
+      "avg_score": 0.556,
+      "total_frames": 289,
+      "attentive_pct": 79.6,
+      "distracted_pct": 20.4,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "2": {
+      "avg_score": 0.3,
+      "total_frames": 30,
+      "attentive_pct": 0.0,
+      "distracted_pct": 100.0,
+      "phone_frames": 0,
+      "reading_frames": 0
+    },
+    "3": {
+      "avg_score": 0.383,
+      "total_frames": 17,
+      "attentive_pct": 29.4,
+      "distracted_pct": 70.6,
+      "phone_frames": 0,
+      "reading_frames": 0
+    }
+  }
+}
