@@ -15,6 +15,7 @@ urlpatterns = [
     path('sessions/<int:session_id>/feedback/', views.get_teacher_feedback),
     path('sessions/<int:session_id>/feedback/generate/', views.generate_teacher_feedback),
     path('sessions/<int:session_id>/feedback/email/', views.send_feedback_email_view),
+    path('sessions/<int:session_id>/pdf/', views.download_session_pdf),
     path('sessions/import/', views.import_json_session),
 
     # Attention Logs

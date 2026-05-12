@@ -20,6 +20,7 @@ export const getSessionOverview = (id) => apiFetch(`/sessions/${id}/overview/`);
 export const getSessionSummary = (id) => apiFetch(`/sessions/${id}/summary/`);
 export const getSessionLogs = (id) => apiFetch(`/sessions/${id}/logs/`);
 export const getSessionTimeline = (id) => apiFetch(`/sessions/${id}/timeline/`);
+export const downloadSessionPdf = (id) => { window.open(`${BASE_URL}/sessions/${id}/pdf/`, '_blank'); };
 export const startSession = (label) =>
   apiFetch('/sessions/start/', { method: 'POST', body: JSON.stringify({ label }) });
 export const endSession = (id) =>

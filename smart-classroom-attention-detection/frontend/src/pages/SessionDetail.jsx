@@ -6,11 +6,11 @@ import {
 } from 'recharts';
 import {
   ArrowLeft, Users, AlertTriangle, Smartphone,
-  ChevronUp, ChevronDown, Clock, MessageSquare, Mail, Send, FileText
+  ChevronUp, ChevronDown, Clock, MessageSquare, Mail, Send, FileText, Download
 } from 'lucide-react';
 import {
   getSessionOverview, getSessionSummary, getSessionTimeline,
-  getTeacherFeedback, generateTeacherFeedback, sendFeedbackEmail
+  getTeacherFeedback, generateTeacherFeedback, sendFeedbackEmail, downloadSessionPdf
 } from '../api';
 
 const GRADE_COLOR = { A: '#22c55e', B: '#86efac', C: '#facc15', D: '#fb923c', F: '#ef4444' };
@@ -81,6 +81,7 @@ export default function SessionDetail() {
   const [showSendEmail, setShowSendEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -110,11 +111,20 @@ export default function SessionDetail() {
   const handleSendEmail = async () => {
     if (!emailInput.trim()) return;
     setEmailSending(true);
+    setEmailError('');
     try {
       await sendFeedbackEmail(id, emailInput.trim());
       setEmailSent(true);
       setShowSendEmail(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      try {
+        const errObj = JSON.parse(e.message);
+        setEmailError(errObj.error || 'Failed to send email.');
+      } catch {
+        setEmailError('Failed to send email. Check address and try again.');
+      }
+    }
     finally { setEmailSending(false); }
   };
 
@@ -252,10 +262,16 @@ export default function SessionDetail() {
           </div>
           <div className="flex items-center gap-2">
             {feedback && (
-              <button className="btn btn-ghost" onClick={() => { setShowSendEmail(!showSendEmail); setEmailSent(false); }}
-                style={{ fontSize: 12, padding: '6px 14px' }}>
-                <Mail size={13} /> Email Report
-              </button>
+              <>
+                <button className="btn btn-ghost" onClick={() => downloadSessionPdf(id)}
+                  style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <Download size={13} /> Download PDF
+                </button>
+                <button className="btn btn-ghost" onClick={() => { setShowSendEmail(!showSendEmail); setEmailSent(false); }}
+                  style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <Mail size={13} /> Email Report
+                </button>
+              </>
             )}
             {!feedback && (
               <button className="btn btn-primary" onClick={() => setShowGenEmail(true)}
@@ -295,10 +311,17 @@ export default function SessionDetail() {
               <Send size={13} />
               {emailSending ? 'Sending…' : 'Send Email'}
             </button>
-            <button className="btn btn-ghost" onClick={() => setShowSendEmail(false)}
+            <button className="btn btn-ghost" onClick={() => { setShowSendEmail(false); setEmailError(''); }}
               style={{ fontSize: 12, padding: '8px 12px' }}>Cancel</button>
           </div>
         )}
+        
+        {emailError && (
+          <div style={{ marginTop: 10, fontSize: 13, color: '#ef4444' }} className="flex items-center gap-2">
+            <AlertTriangle size={13} /> {emailError}
+          </div>
+        )}
+
         {emailSent && (
           <div style={{ marginTop: 10, fontSize: 13, color: '#22c55e' }} className="flex items-center gap-2">
             <Mail size={13} /> ✓ Report sent to {emailInput}

@@ -9,6 +9,8 @@ from .serializers import (
     StudentSerializer, SessionSerializer, SessionDetailSerializer,
     AttentionLogSerializer, SessionSummarySerializer, TeacherFeedbackSerializer
 )
+from .pdf_utils import generate_session_pdf
+from django.http import FileResponse
 
 # ── SESSIONS ──
 
@@ -300,7 +302,9 @@ def generate_teacher_feedback(request, session_id):
     send_email = request.data.get('send_email', False)
     email_to = request.data.get('email', '')
     if send_email and email_to:
-        _send_feedback_email(fb, email_to)
+        success, err = _send_feedback_email(fb, email_to)
+        if not success:
+            return Response({'error': f'Feedback generated, but email failed: {err}'}, status=400)
     return Response(TeacherFeedbackSerializer(fb).data, status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
@@ -318,8 +322,22 @@ def send_feedback_email_view(request, session_id):
     email = request.data.get('email', '').strip()
     if not email:
         return Response({'error': 'Email is required'}, status=400)
-    _send_feedback_email(fb, email)
+    success, error_msg = _send_feedback_email(fb, email)
+    if not success:
+        return Response({'error': f'Failed to send email: {error_msg}'}, status=400)
     return Response({'success': True, 'email_sent_to': email})
+
+@api_view(['GET'])
+def download_session_pdf(request, session_id):
+    """Generate and return a PDF report for the session."""
+    try:
+        session = Session.objects.get(id=session_id)
+        fb = TeacherFeedback.objects.filter(session=session).first()
+    except Session.DoesNotExist:
+        return Response({'error': 'Session not found'}, status=404)
+    
+    pdf_buffer = generate_session_pdf(session, fb)
+    return FileResponse(pdf_buffer, as_attachment=True, filename=f"Session_Report_{session.id}.pdf")
 
 # ── HELPERS ──
 
@@ -412,14 +430,26 @@ def _auto_generate_feedback(session):
     return fb
 
 def _send_feedback_email(feedback, to_email):
-    from django.core.mail import send_mail
+    from django.core.mail import EmailMessage
     from django.conf import settings
     subject = f"SmartClass AI — Report: {feedback.session.label or f'Session #{feedback.session.id}'}"
-    body = f"{feedback.overall_summary}\n\nRECOMMENDATIONS:\n{feedback.recommendations}"
+    body = f"{feedback.overall_summary}\n\nRECOMMENDATIONS:\n{feedback.recommendations}\n\nPlease find the detailed session report attached as a PDF."
     try:
-        send_mail(subject=subject, message=body, from_email=settings.DEFAULT_FROM_EMAIL,
-                  recipient_list=[to_email], fail_silently=True)
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[to_email]
+        )
+        
+        # Generate PDF and attach it
+        pdf_buffer = generate_session_pdf(feedback.session, feedback)
+        email.attach(f"Session_Report_{feedback.session.id}.pdf", pdf_buffer.getvalue(), 'application/pdf')
+        
+        email.send(fail_silently=False)
         feedback.email_sent = True
         feedback.save()
+        return True, ""
     except Exception as e:
         print(f"[EMAIL] Failed: {e}")
+        return False, str(e)

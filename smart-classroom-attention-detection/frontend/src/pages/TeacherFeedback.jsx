@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Calendar, Clock, ChevronRight, AlertTriangle, TrendingUp, Mail, Send } from 'lucide-react';
-import { listFeedbacks, sendFeedbackEmail } from '../api';
+import { MessageSquare, Calendar, Clock, ChevronRight, AlertTriangle, TrendingUp, Mail, Send, Download } from 'lucide-react';
+import { listFeedbacks, sendFeedbackEmail, downloadSessionPdf } from '../api';
 
 const GRADE_COLOR = { A: '#22c55e', B: '#86efac', C: '#facc15', D: '#fb923c', F: '#ef4444' };
 
@@ -31,15 +31,25 @@ export default function TeacherFeedbackPage() {
   const [emailInput, setEmailInput] = useState('');
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(null);
+  const [emailError, setEmailError] = useState('');
 
   const handleSendEmail = async (sessionId) => {
     if (!emailInput.trim()) return;
     setEmailSending(true);
+    setEmailError('');
     try {
       await sendFeedbackEmail(sessionId, emailInput.trim());
       setEmailSent(sessionId);
       setEmailFor(null);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      try {
+        const errObj = JSON.parse(e.message);
+        setEmailError(errObj.error || 'Failed to send email.');
+      } catch {
+        setEmailError('Failed to send email. Check address and try again.');
+      }
+    }
     finally { setEmailSending(false); }
   };
 
@@ -186,18 +196,30 @@ export default function TeacherFeedbackPage() {
                               style={{ fontSize: 12, padding: '7px 14px' }}>
                               <Send size={12} /> {emailSending ? 'Sending…' : 'Send'}
                             </button>
-                            <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setEmailFor(null); }}
+                            <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setEmailFor(null); setEmailError(''); }}
                               style={{ fontSize: 12, padding: '7px 10px' }}>Cancel</button>
                           </>
                         ) : (
-                          <button className="btn btn-ghost" onClick={e => {
-                            e.stopPropagation(); setEmailFor(fb.id); setEmailInput(''); setEmailSent(null);
-                          }} style={{ fontSize: 12, padding: '7px 14px' }}>
-                            <Mail size={12} /> Email to Teacher
-                          </button>
+                          <>
+                            <button className="btn btn-ghost" onClick={e => {
+                              e.stopPropagation(); downloadSessionPdf(fb.session);
+                            }} style={{ fontSize: 12, padding: '7px 14px' }}>
+                              <Download size={12} /> Download PDF
+                            </button>
+                            <button className="btn btn-ghost" onClick={e => {
+                              e.stopPropagation(); setEmailFor(fb.id); setEmailInput(''); setEmailSent(null); setEmailError('');
+                            }} style={{ fontSize: 12, padding: '7px 14px' }}>
+                              <Mail size={12} /> Email to Teacher
+                            </button>
+                          </>
                         )}
                         {emailSent === fb.session && (
                           <span style={{ fontSize: 12, color: '#22c55e' }}>✓ Sent!</span>
+                        )}
+                        {emailError && emailFor === fb.id && (
+                          <div style={{ fontSize: 13, color: '#ef4444', marginLeft: 10 }} className="flex items-center gap-1">
+                            <AlertTriangle size={13} /> {emailError}
+                          </div>
                         )}
                       </div>
                     </div>
