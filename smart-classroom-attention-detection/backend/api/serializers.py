@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Student, Session, AttentionLog, SessionSummary
+from .models import Student, Session, AttentionLog, SessionSummary, TeacherFeedback
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -9,9 +9,14 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class SessionSerializer(serializers.ModelSerializer):
+    has_feedback = serializers.SerializerMethodField()
+
     class Meta:
         model = Session
         fields = '__all__'
+
+    def get_has_feedback(self, obj):
+        return hasattr(obj, 'feedback') and obj.feedback is not None
 
 
 class AttentionLogSerializer(serializers.ModelSerializer):
@@ -29,10 +34,21 @@ class SessionSummarySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class TeacherFeedbackSerializer(serializers.ModelSerializer):
+    session_label = serializers.CharField(source='session.label', read_only=True)
+    session_started_at = serializers.DateTimeField(source='session.started_at', read_only=True)
+    session_ended_at = serializers.DateTimeField(source='session.ended_at', read_only=True)
+
+    class Meta:
+        model = TeacherFeedback
+        fields = '__all__'
+
+
 class SessionDetailSerializer(serializers.ModelSerializer):
     summaries = SessionSummarySerializer(many=True, read_only=True)
     total_students = serializers.SerializerMethodField()
     avg_class_score = serializers.SerializerMethodField()
+    has_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
@@ -46,3 +62,6 @@ class SessionDetailSerializer(serializers.ModelSerializer):
         if not summaries:
             return None
         return round(sum(s.avg_score for s in summaries) / summaries.count(), 3)
+
+    def get_has_feedback(self, obj):
+        return hasattr(obj, 'feedback') and obj.feedback is not None

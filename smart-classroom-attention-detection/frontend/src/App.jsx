@@ -1,21 +1,21 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, History, BookOpen, Users, Activity, Eye, Wifi, WifiOff } from 'lucide-react';
+import { LayoutDashboard, History, Users, Eye, WifiOff, MessageSquare } from 'lucide-react';
 import { getActiveSession } from './api';
 import DashboardHome from './pages/DashboardHome';
 import SessionHistory from './pages/SessionHistory';
 import SessionDetail from './pages/SessionDetail';
 import StudentsList from './pages/StudentsList';
 import StudentProfile from './pages/StudentProfile';
+import TeacherFeedback from './pages/TeacherFeedback';
 import './index.css';
 
 function Sidebar({ isLive, sessionLabel }) {
-  const location = useLocation();
-
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/sessions', icon: History, label: 'Session History' },
     { to: '/students', icon: Users, label: 'Students' },
+    { to: '/feedback', icon: MessageSquare, label: 'Teacher Feedback' },
   ];
 
   return (
@@ -33,12 +33,8 @@ function Sidebar({ isLive, sessionLabel }) {
       <nav className="sidebar-nav">
         <span className="sidebar-section-label">Navigation</span>
         {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-          >
+          <NavLink key={to} to={to} end={to === '/'}
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Icon className="nav-icon" size={18} />
             {label}
           </NavLink>
@@ -75,9 +71,7 @@ function AppLayout() {
         const data = await getActiveSession();
         setIsLive(data.active);
         setSessionLabel(data.session?.label || '');
-      } catch {
-        setIsLive(false);
-      }
+      } catch { setIsLive(false); }
     };
     check();
     const interval = setInterval(check, 5000);
@@ -94,6 +88,7 @@ function AppLayout() {
           <Route path="/sessions/:id" element={<SessionDetail />} />
           <Route path="/students" element={<StudentsList />} />
           <Route path="/students/:id" element={<StudentProfile />} />
+          <Route path="/feedback" element={<TeacherFeedback />} />
         </Routes>
       </main>
     </div>

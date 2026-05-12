@@ -152,3 +152,27 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
 }
+
+# Email Configuration — Gmail SMTP for real delivery
+# Set these environment variables before starting the server:
+#   set SMTP_EMAIL=your-gmail@gmail.com
+#   set SMTP_PASSWORD=your-app-password
+# To create a Gmail App Password: Google Account → Security → 2-Step Verification → App Passwords
+import os
+_smtp_email = os.environ.get('SMTP_EMAIL', '')
+_smtp_password = os.environ.get('SMTP_PASSWORD', '')
+
+if _smtp_email and _smtp_password:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = _smtp_email
+    EMAIL_HOST_PASSWORD = _smtp_password
+    DEFAULT_FROM_EMAIL = _smtp_email
+else:
+    # Fallback: console backend (prints email to terminal)
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'smartclass-ai@noreply.com'
+    import warnings
+    warnings.warn('SMTP_EMAIL/SMTP_PASSWORD not set. Emails will print to console only.')

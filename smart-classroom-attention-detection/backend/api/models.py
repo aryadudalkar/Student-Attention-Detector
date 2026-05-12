@@ -71,3 +71,17 @@ class SessionSummary(models.Model):
 
     def __str__(self):
         return f"Summary | Student {self.student.student_id} | Session {self.session.id} | {self.grade}"
+
+
+class TeacherFeedback(models.Model):
+    session = models.OneToOneField(Session, on_delete=models.CASCADE, related_name='feedback')
+    generated_at = models.DateTimeField(auto_now_add=True)
+    overall_summary = models.TextField()
+    peak_distraction_periods = models.JSONField(default=list)
+    recommendations = models.TextField(blank=True)
+    avg_attention_score = models.FloatField()
+    total_students_tracked = models.IntegerField()
+    email_sent = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Feedback | Session {self.session.id} | {self.generated_at}"
