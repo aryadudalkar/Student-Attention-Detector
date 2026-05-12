@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Clock, Users, ChevronRight, History } from 'lucide-react';
 import { getSessions } from '../api';
 
@@ -30,17 +30,31 @@ export default function SessionHistory() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const location = useLocation();
 
-  useEffect(() => {
+  const fetchSessions = useCallback(() => {
     getSessions()
       .then(setSessions)
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = sessions.filter(s =>
-    s.label?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Re-fetch whenever this page is navigated to
+  useEffect(() => {
+    setLoading(true);
+    fetchSessions();
+  }, [location.key, fetchSessions]);
+
+  // Also poll every 10 seconds so active sessions update
+  useEffect(() => {
+    const interval = setInterval(fetchSessions, 10000);
+    return () => clearInterval(interval);
+  }, [fetchSessions]);
+
+  const filtered = sessions.filter(s => {
+    const label = (s.label || `Session #${s.id}`).toLowerCase();
+    return label.includes(search.toLowerCase());
+  });
 
   if (loading) {
     return (
