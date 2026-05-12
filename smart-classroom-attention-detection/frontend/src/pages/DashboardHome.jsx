@@ -118,9 +118,14 @@ export default function DashboardHome() {
   }, []);
 
   const handleStartSession = async (label) => {
-    await startSession(label);
-    setShowModal(false);
-    fetchData();
+    try {
+      await startSession(label);
+      setShowModal(false);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to start session:', err);
+      alert('Failed to start session. Make sure the backend server is running.');
+    }
   };
 
   const handleEndSession = async () => {
