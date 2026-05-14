@@ -199,20 +199,31 @@ def class_overview(request, session_id):
         total = student_ids.count()
         attentive = partial = distracted = phone = 0
         scores = []
+        # Use only the LAST 5 logs per student for a highly responsive "current state" view
+        RECENT_WINDOW = 5
         for sid in student_ids:
-            sl = logs.filter(student_id=sid)
-            avg = sum(sl.values_list('attention_score', flat=True)) / sl.count()
+            recent = logs.filter(student_id=sid).order_by('-timestamp')[:RECENT_WINDOW]
+            recent_scores = [r.attention_score for r in recent]
+            
+            # The class average can use the smoothed window
+            avg = sum(recent_scores) / len(recent_scores) if recent_scores else 0
             scores.append(avg)
-            if avg >= 0.70: attentive += 1
-            elif avg >= 0.50: partial += 1
+            
+            # For the student's CURRENT category, use their very latest score
+            # so the dashboard updates instantly when they move their head.
+            latest_score = recent_scores[0] if recent_scores else 0
+            if latest_score >= 0.70: attentive += 1
+            elif latest_score >= 0.50: partial += 1
             else: distracted += 1
-            if sl.filter(object_detected='phone').exists(): phone += 1
+            
+            if logs.filter(student_id=sid, object_detected='phone').order_by('-timestamp')[:RECENT_WINDOW].exists(): phone += 1
         avg_score = sum(scores) / len(scores) if scores else 0
         return Response({'session_id': session_id, 'total_students': total,
             'class_avg_score': round(avg_score, 3), 'class_grade': _score_to_grade(avg_score),
             'attentive_count': attentive, 'partially_attentive_count': partial,
             'distracted_count': distracted, 'phone_detected_count': phone,
             'attentive_pct': round(attentive / total * 100, 1) if total else 0,
+            'partially_attentive_pct': round(partial / total * 100, 1) if total else 0,
             'distracted_pct': round(distracted / total * 100, 1) if total else 0})
 
     summaries = SessionSummary.objects.filter(session_id=session_id).select_related('student')
@@ -220,14 +231,21 @@ def class_overview(request, session_id):
         return Response({'error': 'No data for this session'}, status=404)
     total = summaries.count()
     avg_score = sum(s.avg_score for s in summaries) / total
+    
+    attentive = summaries.filter(avg_score__gte=0.70).count()
+    partial = summaries.filter(avg_score__gte=0.50, avg_score__lt=0.70).count()
+    distracted = summaries.filter(avg_score__lt=0.50).count()
+    phone = summaries.filter(phone_frames__gt=0).count()
+    
     return Response({'session_id': session_id, 'total_students': total,
         'class_avg_score': round(avg_score, 3), 'class_grade': _score_to_grade(avg_score),
-        'attentive_count': summaries.filter(avg_score__gte=0.70).count(),
-        'partially_attentive_count': summaries.filter(avg_score__gte=0.50, avg_score__lt=0.70).count(),
-        'distracted_count': summaries.filter(avg_score__lt=0.50).count(),
-        'phone_detected_count': summaries.filter(phone_frames__gt=0).count(),
-        'attentive_pct': round(summaries.filter(avg_score__gte=0.70).count() / total * 100, 1),
-        'distracted_pct': round(summaries.filter(avg_score__lt=0.50).count() / total * 100, 1)})
+        'attentive_count': attentive,
+        'partially_attentive_count': partial,
+        'distracted_count': distracted,
+        'phone_detected_count': phone,
+        'attentive_pct': round(attentive / total * 100, 1) if total else 0,
+        'partially_attentive_pct': round(partial / total * 100, 1) if total else 0,
+        'distracted_pct': round(distracted / total * 100, 1) if total else 0})
 
 # ── DISTRACTION TIMELINE ──
 

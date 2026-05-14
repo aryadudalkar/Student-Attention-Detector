@@ -93,9 +93,10 @@ def run(camera_index: int = 0):
     session_id = start_session(label="Webcam Session")
     batch_logs = []
     batch_counter = 0
+    BATCH_SIZE = 5  # Send to API every N observations (lower = faster dashboard updates)
 
     print(f"[INFO] Webcam started (camera {camera_index}) - HYBRID MODE")
-    print(f"[INFO] Raw webcap FPS: 46 - Optimizing detection...")
+    print(f"[INFO] Batch size: {BATCH_SIZE} (data sent to dashboard every {BATCH_SIZE} frames)")
     print("[INFO] Press ESC to quit.\n")
 
     # SMART FRAME SKIPPING: Process detection at different rates
@@ -209,9 +210,10 @@ def run(camera_index: int = 0):
                     "roll": head_details.get("roll"),
                 })
 
-            # Send batch every 30 frames
+            # Send batch every BATCH_SIZE observations
             batch_counter += 1
-            if batch_counter >= 30:
+            if batch_counter >= BATCH_SIZE:
+                print(f"[BATCH] Sending {len(batch_logs)} logs to API (session={session_id})")
                 log_attention_batch(batch_logs)
                 batch_logs = []
                 batch_counter = 0

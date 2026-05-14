@@ -33,8 +33,9 @@ class FaceDetector:
         base = os.path.dirname(__file__)
         possible_paths = [
             model_name, # Current working directory
-            os.path.join(base, "..", "model", model_name),
-            os.path.join(base, model_name)
+            os.path.join(base, "..", model_name),           # smart-classroom-attention-detection/
+            os.path.join(base, "..", "model", model_name),  # smart-classroom-attention-detection/model/
+            os.path.join(base, model_name),                 # scripts/
         ]
 
         # 1. Try to find and load the YOLO model

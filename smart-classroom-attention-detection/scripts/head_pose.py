@@ -10,6 +10,22 @@ import mediapipe as mp
 import numpy as np
 from _shared_models import get_pose_model
 
+# ── CONFIGURABLE THRESHOLDS (degrees) ──────────────────────────────
+# |angle| <= ATTENTIVE_MAX  → considered facing forward (attentive)
+# ATTENTIVE_MAX < |angle| <= DISTRACTED_MIN → borderline (partial)
+# |angle| > DISTRACTED_MIN  → clearly looking away (distracted)
+ATTENTIVE_MAX_YAW    = 25.0   # degrees left/right
+ATTENTIVE_MAX_PITCH  = 25.0   # degrees up/down
+DISTRACTED_MIN_YAW   = 40.0
+DISTRACTED_MIN_PITCH = 40.0
+
+# Natural pitch offset: webcams sit above screen, so looking at screen
+# naturally produces a small negative pitch.  This offset is SUBTRACTED
+# from the measured pitch before thresholding so that looking at the
+# screen registers as ~0°.
+PITCH_OFFSET = -8.0   # degrees (negative = looking slightly down is normal)
+# ────────────────────────────────────────────────────────────────────
+
 _FACE_MESH = None
 
 _IDX_NOSE = 1
@@ -30,6 +46,8 @@ _MODEL_POINTS = np.array(
     ],
     dtype=np.float64,
 )
+
+_frame_counter = 0
 
 
 def _get_face_mesh():
@@ -150,6 +168,9 @@ def get_head_score(frame, return_details=False):
     """
     Estimate head pose score from a face crop.
 
+    Uses symmetric thresholds for yaw (left/right) and offset-corrected
+    pitch (up/down) so that looking at the screen is considered forward.
+
     Args:
         frame: face crop (preferred) or person crop.
         return_details: whether to also return Euler angles.
@@ -157,26 +178,56 @@ def get_head_score(frame, return_details=False):
     Returns:
         float score in [0,1], or (score, details) when return_details=True.
     """
+    global _frame_counter
+    _frame_counter += 1
+
     details = _euler_from_crop(frame)
     if details is None:
         details = _fallback_from_pose(frame)
     if details is None:
         if return_details:
-            return 0.3, {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}
-        return 0.3
+            return 0.60, {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}
+        return 0.60
 
-    yaw = details["yaw"]
-    pitch = details["pitch"]
+    raw_yaw = details["yaw"]
+    raw_pitch = details["pitch"]
 
-    yaw_score = max(0.0, 1.0 - (abs(yaw) / 45.0))
-    pitch_score = max(0.0, 1.0 - (max(0.0, -pitch - 10.0) / 35.0))
+    # Apply offset: subtract natural webcam pitch so that "looking at screen" ≈ 0°
+    corrected_pitch = raw_pitch - PITCH_OFFSET
+    abs_yaw = abs(raw_yaw)
+    abs_pitch = abs(corrected_pitch)
 
-    score = 0.65 * yaw_score + 0.35 * pitch_score
+    # ── Yaw score: linear ramp from 1.0 (forward) to 0.0 (>= DISTRACTED) ──
+    if abs_yaw <= ATTENTIVE_MAX_YAW:
+        yaw_score = 1.0
+    elif abs_yaw >= DISTRACTED_MIN_YAW:
+        yaw_score = 0.0
+    else:
+        yaw_score = 1.0 - (abs_yaw - ATTENTIVE_MAX_YAW) / (DISTRACTED_MIN_YAW - ATTENTIVE_MAX_YAW)
 
-    if abs(yaw) > 30.0 or pitch < -20.0:
-        score = min(score, 0.35)
+    # ── Pitch score: same approach, with offset correction ──
+    if abs_pitch <= ATTENTIVE_MAX_PITCH:
+        pitch_score = 1.0
+    elif abs_pitch >= DISTRACTED_MIN_PITCH:
+        pitch_score = 0.0
+    else:
+        pitch_score = 1.0 - (abs_pitch - ATTENTIVE_MAX_PITCH) / (DISTRACTED_MIN_PITCH - ATTENTIVE_MAX_PITCH)
+
+    # Combined: weighted average (yaw more important than pitch for attention)
+    score = 0.6 * yaw_score + 0.4 * pitch_score
+
+    # Hard cap ONLY for extreme angles
+    if abs_yaw > DISTRACTED_MIN_YAW or abs_pitch > DISTRACTED_MIN_PITCH:
+        score = min(score, 0.20)
 
     score = float(np.clip(score, 0.0, 1.0))
+
+    # Debug logging (every 30th frame to avoid spam)
+    if _frame_counter % 30 == 0:
+        print(f"[HEAD_POSE] yaw={raw_yaw:.1f}° pitch={raw_pitch:.1f}° (corrected={corrected_pitch:.1f}°) | "
+              f"yaw_score={yaw_score:.2f} pitch_score={pitch_score:.2f} | "
+              f"final_head_score={score:.2f}")
+
     if return_details:
         return score, details
     return score

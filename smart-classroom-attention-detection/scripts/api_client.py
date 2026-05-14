@@ -15,10 +15,10 @@ def start_session(label=None):
     try:
         res = requests.post(f"{BASE_URL}/sessions/start/", json={"label": label})
         data = res.json()
-        print(f"[API] Session started: ID={data['id']}")
+        print(f"[API] ✅ Session started: ID={data['id']}")
         return data["id"]
     except Exception as e:
-        print(f"[API] Failed to start session: {e}")
+        print(f"[API] ❌ Failed to start session: {e}")
         return None
 
 
@@ -26,10 +26,10 @@ def end_session(session_id):
     """End an active session."""
     try:
         res = requests.post(f"{BASE_URL}/sessions/{session_id}/end/")
-        print(f"[API] Session {session_id} ended.")
+        print(f"[API] ✅ Session {session_id} ended.")
         return res.json()
     except Exception as e:
-        print(f"[API] Failed to end session: {e}")
+        print(f"[API] ❌ Failed to end session: {e}")
         return None
 
 
@@ -44,10 +44,12 @@ def log_attention_batch(logs: list):
         return
     try:
         res = requests.post(f"{BASE_URL}/logs/batch/", json={"logs": logs})
-        if res.status_code != 201:
-            print(f"[API] Batch log error: {res.text}")
+        if res.status_code == 201:
+            print(f"[API] ✅ Batch sent: {len(logs)} logs (status={res.status_code})")
+        else:
+            print(f"[API] ⚠️ Batch log unexpected status {res.status_code}: {res.text[:200]}")
     except Exception as e:
-        print(f"[API] Failed to send logs: {e}")
+        print(f"[API] ❌ Failed to send logs: {e}")
 
 
 def get_or_create_student(student_id: int, name=None, usn=None):
@@ -66,7 +68,11 @@ def get_or_create_student(student_id: int, name=None, usn=None):
             payload["usn"] = usn
         res = requests.post(f"{BASE_URL}/students/", json=payload)
         if res.status_code == 201:
-            return res.json()["id"]
+            db_id = res.json()["id"]
+            print(f"[API] ✅ Created student: tracker_id={student_id} → db_id={db_id}")
+            return db_id
+        else:
+            print(f"[API] ⚠️ Student create unexpected status {res.status_code}: {res.text[:200]}")
     except Exception as e:
-        print(f"[API] Failed to get/create student {student_id}: {e}")
+        print(f"[API] ❌ Failed to get/create student {student_id}: {e}")
     return None

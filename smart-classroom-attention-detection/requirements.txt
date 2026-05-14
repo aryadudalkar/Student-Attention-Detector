@@ -2,7 +2,7 @@ ultralytics
 opencv-python
 torch
 torchvision
-numpy<2.0.0
+numpy
 mediapipe
 deep-sort-realtime
 insightface

@@ -65,8 +65,8 @@ def get_gaze_score(frame, return_details=False):
     result = mesh.process(rgb)
     if not result.multi_face_landmarks:
         if return_details:
-            return 0.3, {"gaze_x": 0.0, "gaze_y": 0.0}
-        return 0.3
+            return 0.60, {"gaze_x": 0.0, "gaze_y": 0.0}
+        return 0.60
 
     lm = result.multi_face_landmarks[0].landmark
 
@@ -113,14 +113,14 @@ def _fallback_gaze_pose(frame, return_details=False):
     results = model(frame, verbose=False)
     if not results or results[0].keypoints is None:
         if return_details:
-            return 0.3, {"gaze_x": 0.0, "gaze_y": 0.0}
-        return 0.3
+            return 0.60, {"gaze_x": 0.0, "gaze_y": 0.0}
+        return 0.60
 
     kpts_xy = results[0].keypoints.xy
     if len(kpts_xy) == 0:
         if return_details:
-            return 0.3, {"gaze_x": 0.0, "gaze_y": 0.0}
-        return 0.3
+            return 0.60, {"gaze_x": 0.0, "gaze_y": 0.0}
+        return 0.60
 
     kpts = kpts_xy[0].cpu().numpy()
     nose = kpts[0]

@@ -12,11 +12,30 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
+/**
+ * Same as apiFetch but returns null instead of throwing on 404.
+ * Used for endpoints that legitimately return 404 when no data exists yet.
+ */
+async function apiFetchOrNull(path, options = {}) {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    ...options,
+  });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 // Sessions
 export const getSessions = () => apiFetch('/sessions/');
 export const getActiveSession = () => apiFetch('/sessions/active/');
 export const getSessionDetail = (id) => apiFetch(`/sessions/${id}/`);
-export const getSessionOverview = (id) => apiFetch(`/sessions/${id}/overview/`);
+export const getSessionOverview = (id) => apiFetchOrNull(`/sessions/${id}/overview/`);
 export const getSessionSummary = (id) => apiFetch(`/sessions/${id}/summary/`);
 export const getSessionLogs = (id) => apiFetch(`/sessions/${id}/logs/`);
 export const getSessionTimeline = (id) => apiFetch(`/sessions/${id}/timeline/`);

@@ -183,6 +183,7 @@ export default function SessionDetail() {
             { label: 'Avg Score', value: `${(overview.class_avg_score * 100).toFixed(0)}%`, color: '#818cf8', sub: 'Attention score' },
             { label: 'Total Students', value: overview.total_students, color: '#f1f5f9', sub: 'Tracked in session' },
             { label: 'Attentive', value: `${overview.attentive_pct?.toFixed(0)}%`, color: '#22c55e', sub: `${overview.attentive_count} students` },
+            { label: 'Partial', value: `${overview.partially_attentive_pct?.toFixed(0)}%`, color: '#facc15', sub: `${overview.partially_attentive_count} students` },
             { label: 'Distracted', value: `${overview.distracted_pct?.toFixed(0)}%`, color: '#ef4444', sub: `${overview.distracted_count} students` },
             { label: 'Phone Detected', value: overview.phone_detected_count, color: '#fb923c', sub: 'Students using phone' },
           ].map(({ label, value, color, sub }) => (

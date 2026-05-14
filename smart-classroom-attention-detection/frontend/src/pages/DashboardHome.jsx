@@ -95,16 +95,33 @@ export default function DashboardHome() {
   const fetchData = async () => {
     try {
       const active = await getActiveSession();
+      console.log('[Dashboard] Active session check:', active);
       setSessionData(active);
       if (active.active && active.session?.id) {
-        try {
-          const ov = await getSessionOverview(active.session.id);
+        const ov = await getSessionOverview(active.session.id);
+        console.log('[Dashboard] Overview data:', ov);
+        if (ov) {
           setOverview(ov);
-        } catch { setOverview(null); }
+        } else {
+          // Session is active but no logs yet — show zero-state so cards render
+          setOverview({
+            session_id: active.session.id,
+            total_students: 0,
+            class_avg_score: 0,
+            class_grade: '—',
+            attentive_count: 0,
+            partially_attentive_count: 0,
+            distracted_count: 0,
+            phone_detected_count: 0,
+            attentive_pct: 0,
+            distracted_pct: 0,
+          });
+        }
       } else {
         setOverview(null);
       }
-    } catch {
+    } catch (err) {
+      console.error('[Dashboard] Fetch error:', err);
       setSessionData(null);
     } finally {
       setLoading(false);
@@ -113,7 +130,7 @@ export default function DashboardHome() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 3000);  // Poll every 3s (was 5s)
     return () => clearInterval(interval);
   }, []);
 
